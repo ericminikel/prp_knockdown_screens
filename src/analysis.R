@@ -75,28 +75,33 @@ colnames(cid_smiles) = c('pubchem_cid','smiles')
 # Chapter 1: Hit calling
 ####
 
-# Plot PRNP vs. SNCA 5'UTR hit data to call hits specific to PRNP
-plot_data = sqldf("
-select   p.pubchem_cid,
-         (p.replicate_a_activity_score + p.replicate_b_activity_score)/2 prnp_mean,
-         (s.replicate_a_activity_score + s.replicate_b_activity_score)/2 snca_mean
-from     prnp_5utr_primary p, snca_5utr_primary s
-where    p.pubchem_cid = s.pubchem_cid
-;")
+compounds = cid_smiles
+prnp_5utr_primary$mean = (prnp_5utr_primary$replicate_a_activity_score + prnp_5utr_primary$replicate_b_activity_score)/2
+compounds$prnp_z = pmax(pmin(scale(prnp_5utr_primary$mean[match(compounds$pubchem_cid,prnp_5utr_primary$pubchem_cid)]),5),-5)
+snca_5utr_primary$mean = (snca_5utr_primary$replicate_a_activity_score + snca_5utr_primary$replicate_b_activity_score)/2
+compounds$snca_z = pmax(pmin(scale(snca_5utr_primary$mean[match(compounds$pubchem_cid,snca_5utr_primary$pubchem_cid)]),5),-5)
+compounds$app_z = pmax(pmin(scale(app_5utr_primary$ps_inh_2um[match(compounds$pubchem_cid, app_5utr_primary$pubchem_cid)]),5),-5)
 
-par(mar=c(6,6,6,6))
-plot(-plot_data$prnp_mean, -plot_data$snca_mean, xlim=c(-100,100), ylim=c(-150,150), axes=FALSE, xlab='', ylab='', pch=20, cex=.2)
+plot(compounds$prnp_z, compounds$snca_z, xlim=c(-5,5), ylim=c(-5,5), xaxs='i', yaxs='i', axes=FALSE, xlab='', ylab='', pch=20, cex=.2)
 abline(h=0, col=axis_col, lwd=2)
 abline(v=0, col=axis_col, lwd=2)
-mtext(side=2, at=0, las=2, line=0, text=expression(italic('PRNP')~'down'), col=axis_col)
-mtext(side=4, at=0, las=2, line=0, text=expression(italic('PRNP')~'up'), col=axis_col)
-mtext(side=1, at=0, line=0, text=expression(italic('SNCA')~'down'), col=axis_col)
-mtext(side=3, at=0, line=0, text=expression(italic('SNCA')~'up'), col=axis_col)
-rect(xleft=-100,xright=-30,ybottom=-25,ytop=25,border=axis_col,lwd=4)
+mtext(side=2, at=0, las=2, line=0, text=expression(italic('PRNP')~'inactive'), col=axis_col)
+mtext(side=4, at=0, las=2, line=0, text=expression(italic('PRNP')~'active'), col=axis_col)
+mtext(side=1, at=0, line=0, text=expression(italic('SNCA')~'inactive'), col=axis_col)
+mtext(side=3, at=0, line=0, text=expression(italic('SNCA')~'active'), col=axis_col)
+rect(xleft=2.5, xright=5, ybottom=-1, ytop=1, border=axis_col, lwd=4)
 
-n_hits = sum(-plot_data$prnp_mean < -50 & abs(plot_data$snca_mean < 25), na.rm=TRUE)
-n_hits
+plot(compounds$prnp_z, compounds$app_z, xlim=c(-5,5), ylim=c(-5,5), xaxs='i', yaxs='i', axes=FALSE, xlab='', ylab='', pch=20, cex=.2)
+abline(h=0, col=axis_col, lwd=2)
+abline(v=0, col=axis_col, lwd=2)
+mtext(side=2, at=0, las=2, line=0, text=expression(italic('PRNP')~'inactive'), col=axis_col)
+mtext(side=4, at=0, las=2, line=0, text=expression(italic('PRNP')~'active'), col=axis_col)
+mtext(side=1, at=0, line=0, text=expression(italic('APP')~'inactive'), col=axis_col)
+mtext(side=3, at=0, line=0, text=expression(italic('APP')~'active'), col=axis_col)
+rect(xleft=2.5, xright=5, ybottom=-1, ytop=1, border=axis_col, lwd=4)
 
+mean(!is.na(compounds$snca_z[!is.na(compounds$prnp_z)]))
+mean(!is.na(compounds$app_z[!is.na(compounds$prnp_z)]))
 
 # Table counting hits and how they are progressively eliminated
 hit_table = data.frame(step=character(0), count=integer(0))

@@ -13,8 +13,8 @@ outdir = '~/d/j/cureffi/media/2015/11'
 ####
 
 axis_col = '#000000'
-hl_col = '#FF2015'
-pt_col = '#388E8E'
+hl_col = '#660000'
+pt_col = '#FF9912'
 
 # pubchem data have the annoying property that the header row with the
 # column names is followed by several rows of extra metadata that is a
@@ -99,9 +99,9 @@ compounds = unique(rbind(cid_smiles, silber2014[,c('pubchem_cid','smiles')]))
 ####
 
 # generate ECFP6 fingerprints for each compound. NOTE: this takes >10 minutes
-fps = list(nrow(cid_smiles))
-for (i in 1:nrow(cid_smiles)) {
-  mol = parse.smiles(cid_smiles$smiles[i])[[1]]
+fps = list(nrow(compounds))
+for (i in 1:nrow(compounds)) {
+  mol = parse.smiles(compounds$smiles[i])[[1]]
   fp = get.fingerprint(mol, type='circular', fp.mode = 'bit', depth=6, size=1024, verbose=FALSE)
   fps[i] = fp
 }
@@ -111,14 +111,17 @@ for (i in 1:nrow(cid_smiles)) {
 mean(iec6_cytotox$pubchem_cid %in% compounds$pubchem_cid)
 mean(baf3_cytotox$pubchem_cid %in% compounds$pubchem_cid)
 
-compounds$iec6_tox = iec6_cytotox$inhibition[match(compounds$pubchem_cid,iec6_cytotox$pubchem_cid)]
-compounds$baf3_tox = baf3_cytotox$inhibition[match(compounds$pubchem_cid,baf3_cytotox$pubchem_cid)]
+compounds$iec6_tox = pmax(pmin(scale(iec6_cytotox$inhibition[match(compounds$pubchem_cid,iec6_cytotox$pubchem_cid)]),5),-5)
+compounds$baf3_tox = pmax(pmin(scale(baf3_cytotox$inhibition[match(compounds$pubchem_cid,baf3_cytotox$pubchem_cid)]),5),-5)
 
-cor.test(compounds$iec6_tox, compounds$baf3_tox)
+cor.test(compounds$iec6_tox, compounds$baf3_tox, method='pearson')
 
 compounds$either_tox = compounds$pubchem_cid %in% c(iec6_cytotox$pubchem_cid[iec6_cytotox$pubchem_activity_outcome=='Active'],baf3_cytotox$pubchem_cid[baf3_cytotox$pubchem_activity_outcome=='Active'])
-compounds$max_tox = pmax(pmin(scale(pmax(compounds$iec6_tox, compounds$baf3_tox)),5),-5)
+compounds$max_tox = pmax(compounds$iec6_tox, compounds$baf3_tox)
 sum(compounds$either_tox) # approx. 1% of the library
+sum(compounds$max_tox > 1, na.rm=TRUE)
+hist(iec6_cytotox$inhibition)
+min(iec6_cytotox$inhibition[iec6_cytotox$pubchem_activity_outcome=='Active'])
 
 
 ####
@@ -129,17 +132,70 @@ sum(compounds$either_tox) # approx. 1% of the library
 compounds$fehta_nominal = compounds$pubchem_cid %in% fehta_primary$pubchem_cid[fehta_primary$pubchem_activity_outcome=='Active']
 # z score of the inhibition metric for new hit calling
 compounds$fehta_z = pmax(pmin(scale(fehta_primary$inhibition_at_13_8_um[match(compounds$pubchem_cid, fehta_primary$pubchem_cid)]),5),-5)
-png('~/d/j/cureffi/media/2015/11/cell-surface-prp-vs-cytotox.png',width=600,height=600)
-par(mar=c(4,4,2,2))
-plot(compounds$fehta_z, compounds$max_tox, xlim=c(-5,5), ylim=c(-5,5), xaxs='i', yaxs='i', axes=FALSE, xlab='', ylab='', pch=20, cex=.2, col=pt_col)
-axis(side=1, at=(-2:2)*2.5, col=axis_col, col.axis=axis_col)
-axis(side=2, at=(-2:2)*2.5, col=axis_col, col.axis=axis_col, las=2)
-mtext(side=1, line=2, text='inactive \u2190           \u2192 active')
-mtext(side=1, line=3, text='cell surface PrP reduction')
-rect(xleft=2.5, xright=5, ybottom=-1, ytop=1, border=hl_col, lwd=4)
+png(paste(outdir,'cell-surface-prp-vs-cytotox.png',sep='/'),width=600,height=600)
+par(mar=c(7,7,2,2))
+plot(compounds$fehta_z, compounds$max_tox, xlim=c(-5,5.1), ylim=c(-5,5), xaxs='i', yaxs='i', axes=FALSE, xlab='', ylab='', pch=20, cex=.2, col=pt_col)
+axis(side=1, at=(-2:2)*2.5, col=axis_col, col.axis=axis_col, cex.axis=1.5)
+axis(side=2, at=(-2:2)*2.5, col=axis_col, col.axis=axis_col, las=2, cex.axis=1.5)
+mtext(side=1, line=3.5, text='inactive \u2190                                                \u2192 active', cex=1.5)
+mtext(side=1, line=5, text='cell surface PrP reduction (Z score)', cex=2)
+mtext(side=2, line=3.5, text='non-toxic \u2190                                               \u2192 toxic', cex=1.5)
+mtext(side=2, line=5, text='cytotoxicity (Z score)', cex=2)
+rect(xleft=3, xright=5, ybottom=-2, ytop=1, border=hl_col, lwd=4)
+text(x=4,y=-2,pos=1,labels='hits',font=2,cex=1.5,col=hl_col)
 dev.off()
 
-compounds$
+compounds$fehta_hit = !is.na(compounds$fehta_z) & compounds$fehta_z > 3 & !is.na(compounds$max_tox) & compounds$max_tox > -2 & compounds$max_tox < 1
+mean(compounds$fehta_hit[!is.na(compounds$fehta_z)])
+
+compounds$silber_hit = compounds$pubchem_cid %in% silber2014$pubchem_cid
+
+hit_fps = fps[compounds$fehta_hit | compounds$silber_hit]
+hit_dist_matrix = 1 - fp.sim.matrix(fplist=hit_fps, method='tanimoto')
+hit_clustering = hclust(as.dist(hit_dist_matrix))
+plot(hit_clustering, col=pt_col, labels=FALSE, axes=FALSE, main='Cell surface & total PrP hit clustering', xlab='')
+axis(side=2, at=(0:5)/5, labels=formatC((0:5)/5,format='f',digits=1),las=2)
+abline(h=c(.6,.8), lty=3, lwd=3, col=axis_col)
+
+hits_export = compounds[compounds$fehta_hit | compounds$silber_hit,c('smiles','pubchem_cid','fehta_hit','silber_hit')]
+?hclust
+# if you cluster them at height 0.6, there are no clusters with compounds
+# shared between screens
+hits_export$cluster = cutree(hit_clustering, h=.6)
+sqldf('
+select   cluster,
+         sum(case when fehta_hit then 1 else 0 end) fehta_hits,
+         sum(case when silber_hit then 1 else 0 end) silber_hits
+from     hits_export h
+group by 1
+having   fehta_hits > 0 and silber_hits > 0
+order by 1
+;')
+
+# if you cluster at height 0.8, there are a few clusters with compounds from both screens
+hits_export$cluster = cutree(hit_clustering, h=.8)
+sqldf('
+select   cluster,
+         sum(case when fehta_hit then 1 else 0 end) fehta_hits,
+         sum(case when silber_hit then 1 else 0 end) silber_hits
+from     hits_export h
+group by 1
+having   fehta_hits > 0 and silber_hits > 0
+order by 1
+;')
+# cluster 109
+paste(hits_export$smiles[hits_export$cluster==109],collapse='.')
+# cluster 201
+paste(hits_export$smiles[hits_export$cluster==201],collapse='.')
+
+
+hits_export$smiles[hits_export$cluster==109 & hits_export$silber_hit]
+
+hits_export = hits_export[hits_export$cluster %in% which(table(hits_export$cluster) > 1),]
+
+# write them out to use the Shoichet tool
+write.table(hits_export[,c('smiles','pubchem_cid')],'results/hits.smi',sep=' ',row.names=FALSE,col.names=TRUE)
+
 
 ####
 # Chapter 4: 5'UTR hit calling & analysis
@@ -188,7 +244,7 @@ compounds$prnp_hit = compounds$prnp_hit & ((!compounds$either_tox) | is.na(compo
 hit_table = rbind(hit_table,cbind('Non-toxic (if tested) in Ba/F3 & IEC6 cells',sum(compounds$prnp_hit)))
 compounds$prnp_hit = compounds$prnp_hit & !(compounds$pubchem_cid %in% gfp_counterscreen$pubchem_cid[gfp_counterscreen$pubchem_activity_outcome=='Inactive'])
 compounds$prnp_hit = compounds$prnp_hit & !(compounds$pubchem_cid %in% luciferase_inhibitors$pubchem_cid[luciferase_inhibitors$pubchem_activity_outcome=='Active'])
-hit_table = rbind(hit_table,cbind('Not luciferase inhibitors',sum(compounds$prnp_hit)))
+hit_table = rbind(hit_table,cbind('Not found to be luciferase inhibitors',sum(compounds$prnp_hit)))
 compounds$prnp_hit = compounds$prnp_hit & !(compounds$pubchem_cid %in% prnp_dose_1$pubchem_cid[prnp_dose_1$pubchem_activity_outcome=='Inactive'])
 compounds$prnp_hit = compounds$prnp_hit & !(compounds$pubchem_cid %in% prnp_dose_2$pubchem_cid[prnp_dose_2$pubchem_activity_outcome=='Inactive'])
 hit_table = rbind(hit_table,cbind('Active (if tested) in PRNP dose-response',sum(compounds$prnp_hit)))

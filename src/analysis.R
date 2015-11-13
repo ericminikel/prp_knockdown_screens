@@ -76,6 +76,8 @@ iec6_cytotox = read_pubchem('data/AID_1825_datatable_all.csv',skip=5)
 baf3_cytotox = read_pubchem('data/AID_1486_datatable_all.csv',skip=5)
 
 # Silber 2014 (PMID: 24530226) validated hits, correspondence to PubChem CIDs from 3413826967951477504.txt.gz
+silber2014 = read_pubchem('data/AID_1072100_datatable_all.csv',skip=5)
+
 silber2014 = read.table('data/silber-2014-validated-hits.tsv',sep='\t',header=TRUE,allowEscapes=FALSE,comment.char='',quote='')
 silber2014$pubchem_cid = as.integer(silber2014$pubchem_cid)
 silber2014 = silber2014[!is.na(silber2014$pubchem_cid),] # for convenience, remove the 1 w/o a CID

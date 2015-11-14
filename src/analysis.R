@@ -78,9 +78,7 @@ baf3_cytotox = read_pubchem('data/AID_1486_datatable_all.csv',skip=5)
 # Silber 2014 (PMID: 24530226) validated hits, correspondence to PubChem CIDs from 3413826967951477504.txt.gz
 silber2014 = read_pubchem('data/AID_1072100_datatable_all.csv',skip=5)
 
-# astemizole
-astemizole_smiles = 'COC1=CC=C(C=C1)CCN2CCC(CC2)NC3=NC4=CC=CC=C4N3CC5=CC=C(C=C5)F'
-astemizole_cid = compounds$pubchem_cid[compounds$smiles==astemizole]
+
 
 # generate list of all pubchem CIDs to go get SMILES for them and later compute fingerprints
 cids = unique(c(prnp_5utr_primary$pubchem_cid, snca_5utr_primary$pubchem_cid, fehta_primary$pubchem_cid))
@@ -253,9 +251,11 @@ screened_fps = fps[!is.na(compounds$prnp_z)]
 
 
 # specific compounds
-
-astemizole_cid = 2247
-amcinonide_cid = 443958
+# astemizole
+astemizole_smiles = 'COC1=CC=C(C=C1)CCN2CCC(CC2)NC3=NC4=CC=CC=C4N3CC5=CC=C(C=C5)F'
+astemizole_cid = compounds$pubchem_cid[compounds$smiles==astemizole] # 2247
+amcinonide_cid = 443958 # looked it up online
+# these don't seem to be in the MLPCN collection:
 #tunicamycin_a_cid = 11104835
 #tunicamycin_b_cid = 56927836
 #fk506_cid = 445643
@@ -297,7 +297,7 @@ dev.off()
 
 hit_table = data.frame(step=character(0), count=integer(0))
 hit_table = rbind(hit_table,cbind("Unique compounds tested against cell surface PrP",sum(!is.na(compounds$fehta_z))))
-compounds$fehta_hit = !is.na(compounds$fehta_z) & compounds$fehta_z > 2.5 & !is.na(compounds$max_tox) & compounds$max_tox > -2 & compounds$max_tox < 1
+compounds$fehta_hit = !is.na(compounds$fehta_z) & compounds$fehta_z > 2.5 & !is.na(compounds$max_tox) & abs(compounds$max_tox) < 2
 hit_table = rbind(hit_table,cbind("Active and non-toxic",sum(compounds$fehta_hit)))
 compounds$fehta_hit = compounds$fehta_hit & !(compounds$pubchem_cid %in% fehta_conf$pubchem_cid[fehta_conf$pubchem_activity_outcome=='Inactive'])
 hit_table = rbind(hit_table,cbind("Active (if tested) in confirmation screen",sum(compounds$fehta_hit)))
@@ -308,16 +308,21 @@ compounds$silber_hit = compounds$pubchem_cid %in% silber2014$pubchem_cid
 hit_fps = fps[compounds$fehta_hit | compounds$silber_hit]
 hit_dist_matrix = 1 - fp.sim.matrix(fplist=hit_fps, method='tanimoto')
 hit_clustering = hclust(as.dist(hit_dist_matrix))
-plot(hit_clustering, col=pt_col, labels=FALSE, axes=FALSE, main='Cell surface & total PrP hit clustering', xlab='')
-axis(side=2, at=(0:5)/5, labels=formatC((0:5)/5,format='f',digits=1),las=2)
+png(paste(outdir,'cell-surface-total-hit-clustering.png',sep='/'),width=600,height=600)
+par(mar=c(2,8,2,2))
+plot(hit_clustering, col=pt_col, labels=FALSE, axes=FALSE, ann=FALSE)
+mtext(side=3,text='Cell surface & total PrP hit clustering',font=2, cex=1.5)
+axis(side=2, pos=-100, at=(0:5)/5, labels=formatC((0:5)/5,format='f',digits=1),las=2)
+mtext(side=2, line=5, text='Height')
 abline(h=c(.6,.8), lty=3, lwd=3, col=axis_col)
+dev.off()
 
 hits_export = compounds[compounds$fehta_hit | compounds$silber_hit,c('smiles','pubchem_cid','fehta_hit','silber_hit')]
 
 # if you cluster them at height 0.6, there are no clusters with compounds
 # shared between screens
 hits_export$cluster = cutree(hit_clustering, h=.6)
-sqldf('
+shared_cluster = sqldf('
 select   cluster,
       sum(case when fehta_hit then 1 else 0 end) fehta_hits,
       sum(case when silber_hit then 1 else 0 end) silber_hits
@@ -325,12 +330,12 @@ from     hits_export h
 group by 1
 having   fehta_hits > 0 and silber_hits > 0
 order by 1
-;')
-cat(paste(hits_export$smiles[hits_export$cluster==204],collapse='.'))
+;')[,'cluster']
+cat(paste(hits_export$smiles[hits_export$cluster==shared_cluster],collapse='.'))
 
 # if you cluster at height 0.8, there are a few clusters with compounds from both screens
 hits_export$cluster = cutree(hit_clustering, h=.8)
-sqldf('
+shared_clusters = sqldf('
 select   cluster,
       sum(case when fehta_hit then 1 else 0 end) fehta_hits,
       sum(case when silber_hit then 1 else 0 end) silber_hits
@@ -338,55 +343,34 @@ from     hits_export h
 group by 1
 having   fehta_hits > 0 and silber_hits > 0
 order by 1
-;')
-# cluster 109
-paste(hits_export$smiles[hits_export$cluster==109],collapse='.')
-# cluster 201
-paste(hits_export$smiles[hits_export$cluster==201],collapse='.')
+;')[,'cluster']
+cat(paste(hits_export$smiles[hits_export$cluster==shared_clusters[2]],collapse='.'))
 
 
-hits_export$smiles[hits_export$cluster==109 & hits_export$silber_hit]
+hits_export$cluster = cutree(hit_clustering, h=.6)
+fehta_only_5clust = sqldf('
+select   cluster,
+         sum(case when fehta_hit then 1 else 0 end) fehta_hits,
+         sum(case when silber_hit then 1 else 0 end) silber_hits
+from     hits_export h
+group by 1
+having   fehta_hits > 4 and silber_hits = 0
+order by 1
+;')[,'cluster']
 
-hits_export = hits_export[hits_export$cluster %in% which(table(hits_export$cluster) > 1),]
+hits_5clust_export = hits_export[hits_export$cluster %in% fehta_only_5clust,]
 
-# write them out to use the Shoichet tool
-write.table(hits_export[,c('smiles','pubchem_cid')],'results/hits.smi',sep=' ',row.names=FALSE,col.names=TRUE)
+# write them out to use the Shoichet Lab aggregator advisor tool
+write.table(hits_5clust_export[,c('smiles','pubchem_cid')],'results/hits.smi',sep=' ',row.names=FALSE,col.names=TRUE)
+# python shoichet/simi.py similar results/hits.smi
+# empty results - apparently none of these are similar to known aggregators
 
+# write out the clusters as .-delimited groups of SMILES to paste into ChemDraw
+for (cluster in unique(hits_5clust_export$cluster)) {
+  cat(paste(hits_5clust_export$smiles[hits_5clust_export$cluster==cluster],collapse='.'))
+  cat('\n')
+}
 
-# final hit rate
-mean(compounds$prnp_hit[!is.na(compounds$prnp_z)])
-
-
-
-
-# screened_fps_test = screened_fps[1:1000]
-# hit_vs_all_sim = fp.sim.matrix(fplist=hit_fps[1:10], fplist2=screened_fps_test, method='tanimoto')
-# hit_vs_all_dist = 1 - hit_vs_all_sim
-# haclust = hclust(as.dist(hit_vs_all_dist))
-# plot(haclust)
-
-hit_dist = 1 - fp.sim.matrix(hit_fps, method='tanimoto')
-clustering = hclust(as.dist(hit_dist))
-pdf('~/to_delete/cluster.pdf',height=40,width=60)
-plot(clustering)
-dev.off()
-names(clustering)
-nrow(clustering$merge)
-head(clustering$height)
-head(clustering$order)
-head(clustering$labels)
-clustering$height
-length(clustering$height)
-length(unique(clustering$height))
-cid_smiles$smiles[cid_smiles$hit][378]
-plotmol(parse.smiles(cid_smiles$smiles[cid_smiles$hit][75])[[1]])
-cutree(clustering, 4)
-
-
-cid_smiles$pubchem_cid[cid_smiles$hit]
-clusters = cutree(clustering, h=.75)
-head(clusters)
-length(unique(clusters))
 
 
 

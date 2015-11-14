@@ -120,11 +120,8 @@ cor.test(compounds$iec6_tox, compounds$baf3_tox, method='pearson')
 compounds$max_tox = pmax(pmin(pmax(scale(compounds$iec6_tox), scale(compounds$baf3_tox)),5),-5)
 
 
-
-
-
 ####
-# Chapter 4: 5'UTR hit calling & analysis
+# Chapter 3: 5'UTR hit calling & analysis
 ####
 
 prnp_5utr_primary$mean = (prnp_5utr_primary$replicate_a_activity_score + prnp_5utr_primary$replicate_b_activity_score)/2
@@ -361,7 +358,7 @@ order by 1
 hits_5clust_export = hits_export[hits_export$cluster %in% fehta_only_5clust,]
 
 # write them out to use the Shoichet Lab aggregator advisor tool
-write.table(hits_5clust_export[,c('smiles','pubchem_cid')],'results/hits.smi',sep=' ',row.names=FALSE,col.names=TRUE)
+write.table(hits_5clust_export[,c('smiles','pubchem_cid')],'results/fehta_hits.smi',sep=' ',row.names=FALSE,col.names=TRUE)
 # python shoichet/simi.py similar results/hits.smi
 # empty results - apparently none of these are similar to known aggregators
 
@@ -371,6 +368,55 @@ for (cluster in unique(hits_5clust_export$cluster)) {
   cat('\n')
 }
 
+####
+# Chapter 5: return to the 5'UTR data
+####
 
+# re-call hits without requiring presence in FEHTA hits
+hit_table = data.frame(step=character(0), count=integer(0))
+hit_table = rbind(hit_table,cbind("Unique compounds tested against PRNP 5'UTR",nrow(prnp)))
+compounds$prnp_hit = !is.na(compounds$prnp_z) & (!is.na(compounds$snca_z) | !is.na(compounds$app_z))
+hit_table = rbind(hit_table,cbind("Also tested against SNCA and/or APP 5'UTR",sum(compounds$prnp_hit)))
+compounds$prnp_hit = !is.na(compounds$prnp_z) & compounds$prnp_z > 2.5 & (!is.na(compounds$snca_z) | !is.na(compounds$app_z)) & (is.na(compounds$snca_z) | abs(compounds$snca_z) < 2) & (is.na(compounds$app_z) | abs(compounds$app_z) < 2)
+hit_table = rbind(hit_table,cbind('Hits - PRNP active but SNCA and/or APP inactive',sum(compounds$prnp_hit)))
+compounds$prnp_hit = compounds$prnp_hit & compounds$pubchem_cid %in% prnp_5utr_primary$pubchem_cid[prnp_5utr_primary$reproducibility_cosine_transform > .95]
+hit_table = rbind(hit_table,cbind('Inter-replicate reproducibility > 0.95',sum(compounds$prnp_hit)))
+compounds$prnp_hit = compounds$prnp_hit & ((!compounds$either_tox) | is.na(compounds$either_tox))
+hit_table = rbind(hit_table,cbind('Non-toxic (if tested) in Ba/F3 & IEC6 cells',sum(compounds$prnp_hit)))
+compounds$prnp_hit = compounds$prnp_hit & !(compounds$pubchem_cid %in% gfp_counterscreen$pubchem_cid[gfp_counterscreen$pubchem_activity_outcome=='Inactive'])
+compounds$prnp_hit = compounds$prnp_hit & !(compounds$pubchem_cid %in% luciferase_inhibitors$pubchem_cid[luciferase_inhibitors$pubchem_activity_outcome=='Active'])
+hit_table = rbind(hit_table,cbind('Not found to be luciferase inhibitors',sum(compounds$prnp_hit)))
+compounds$prnp_hit = compounds$prnp_hit & !(compounds$pubchem_cid %in% prnp_dose_1$pubchem_cid[prnp_dose_1$pubchem_activity_outcome=='Inactive'])
+compounds$prnp_hit = compounds$prnp_hit & !(compounds$pubchem_cid %in% prnp_dose_2$pubchem_cid[prnp_dose_2$pubchem_activity_outcome=='Inactive'])
+hit_table = rbind(hit_table,cbind('Active (if tested) in PRNP dose-response',sum(compounds$prnp_hit)))
+compounds$prnp_hit = compounds$prnp_hit & !(compounds$pubchem_cid %in% prnp_cherrypick$pubchem_cid[prnp_cherrypick$pubchem_activity_outcome=='Inactive'])
+hit_table = rbind(hit_table,cbind('Active (if tested) in 2.5 uM cherry pick',sum(compounds$prnp_hit)))
 
+hit_fps = fps[compounds$prnp_hit | compounds$silber_hit]
+hit_dist_matrix = 1 - fp.sim.matrix(fplist=hit_fps, method='tanimoto')
+hit_clustering = hclust(as.dist(hit_dist_matrix))
+plot(hit_clustering)
+hits_export = compounds[compounds$prnp_hit | compounds$silber_hit,c('smiles','pubchem_cid','prnp_hit','silber_hit')]
+hits_export$cluster = cutree(hit_clustering, h=.6)
+utr_only_5clust = sqldf('
+select   cluster,
+         sum(case when prnp_hit then 1 else 0 end) prnp_hits,
+         sum(case when silber_hit then 1 else 0 end) silber_hits
+from     hits_export h
+group by 1
+having   prnp_hits > 4 and silber_hits = 0
+order by 1
+;')[,'cluster']
 
+hits_5clust_export = hits_export[hits_export$cluster %in% utr_only_5clust,]
+
+# write them out to use the Shoichet Lab aggregator advisor tool
+write.table(hits_5clust_export[,c('smiles','pubchem_cid')],'results/utr_hits.smi',sep=' ',row.names=FALSE,col.names=TRUE)
+# python shoichet/simi.py similar results/utr_hits.smi
+# again, no output - good
+
+# write out the clusters as .-delimited groups of SMILES to paste into ChemDraw
+for (cluster in unique(hits_5clust_export$cluster)) {
+  cat(paste(hits_5clust_export$smiles[hits_5clust_export$cluster==cluster],collapse='.'))
+  cat('\n')
+}

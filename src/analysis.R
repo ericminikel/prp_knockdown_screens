@@ -135,13 +135,14 @@ compounds$prnp_z = pmax(pmin(scale(prnp_5utr_primary$mean[match(compounds$pubche
 snca_5utr_primary$mean = (snca_5utr_primary$replicate_a_activity_score + snca_5utr_primary$replicate_b_activity_score)/2
 compounds$snca_z = pmax(pmin(scale(snca_5utr_primary$mean[match(compounds$pubchem_cid,snca_5utr_primary$pubchem_cid)]),5),-5)
 compounds$app_z = pmax(pmin(scale(app_5utr_primary$ps_inh_2um[match(compounds$pubchem_cid, app_5utr_primary$pubchem_cid)]),5),-5)
+compounds$fehta_z = pmax(pmin(scale(fehta_primary$inhibition_at_13_8_um[match(compounds$pubchem_cid,fehta_primary$pubchem_cid)]),5),-5) 
 
 
 
 png(paste(outdir,'prnp-vs-snca-app.png',sep='/'),width=1200,height=600)
 par(mar=c(7,7,2,2), mfrow=c(1,2))
 # SNCA
-plot(compounds$prnp_z, compounds$snca_z, xlim=c(-5,5.1), ylim=c(-5,5), xaxs='i', yaxs='i', axes=FALSE, xlab='', ylab='', pch=20, cex=.2, col=pt_col)
+plot(compounds$prnp_z, compounds$snca_z, xlim=c(-5,5.2), ylim=c(-5,5.2), xaxs='i', yaxs='i', axes=FALSE, xlab='', ylab='', pch=20, cex=.2, col=pt_col)
 axis(side=1, at=(-2:2)*2.5, col=axis_col, col.axis=axis_col, cex.axis=1.5)
 axis(side=2, at=(-2:2)*2.5, col=axis_col, col.axis=axis_col, las=2, cex.axis=1.5)
 mtext(side=1, line=3.5, text='inactive \u2190                                                \u2192 active', cex=1.5)
@@ -149,9 +150,9 @@ mtext(side=1, line=5, text='PRNP activity (Z score)', cex=2)
 mtext(side=2, line=3.5, text='inactive \u2190                                                \u2192 active', cex=1.5)
 mtext(side=2, line=5, text='SNCA activity (Z score)', cex=2)
 text(x=3.75,y=-1,pos=1,labels='hits',font=2,cex=1.5,col=hl_col)
-rect(xleft=2.5, xright=5, ybottom=-1, ytop=1, border=hl_col, lwd=4)
+rect(xleft=2.5, xright=5.1, ybottom=-1, ytop=1, border=hl_col, lwd=4)
 # APP
-plot(compounds$prnp_z, compounds$app_z, xlim=c(-5,5.1), ylim=c(-5,5), xaxs='i', yaxs='i', axes=FALSE, xlab='', ylab='', pch=20, cex=.2, col=pt_col)
+plot(compounds$prnp_z, compounds$app_z, xlim=c(-5,5.2), ylim=c(-5,5.2), xaxs='i', yaxs='i', axes=FALSE, xlab='', ylab='', pch=20, cex=.2, col=pt_col)
 axis(side=1, at=(-2:2)*2.5, col=axis_col, col.axis=axis_col, cex.axis=1.5)
 axis(side=2, at=(-2:2)*2.5, col=axis_col, col.axis=axis_col, las=2, cex.axis=1.5)
 mtext(side=1, line=3.5, text='inactive \u2190                                                \u2192 active', cex=1.5)
@@ -159,7 +160,7 @@ mtext(side=1, line=5, text='PRNP activity (Z score)', cex=2)
 mtext(side=2, line=3.5, text='inactive \u2190                                                \u2192 active', cex=1.5)
 mtext(side=2, line=5, text='APP activity (Z score)', cex=2)
 text(x=3.75,y=-1,pos=1,labels='hits',font=2,cex=1.5,col=hl_col)
-rect(xleft=2.5, xright=5, ybottom=-1, ytop=1, border=hl_col, lwd=4)
+rect(xleft=2.5, xright=5.1, ybottom=-1, ytop=1, border=hl_col, lwd=4)
 dev.off()
 
 mean(!is.na(compounds$snca_z[!is.na(compounds$prnp_z)]))
@@ -168,7 +169,7 @@ mean(!is.na(compounds$app_z[!is.na(compounds$prnp_z)]) | !is.na(compounds$snca_z
 
 # Table counting hits and how they are progressively eliminated
 hit_table = data.frame(step=character(0), count=integer(0))
-hit_table = rbind(hit_table,cbind("Unique compounds tested against PRNP 5'UTR",nrow(prnp)))
+hit_table = rbind(hit_table,cbind("Unique compounds tested against PRNP 5'UTR",nrow(prnp_5utr_primary)))
 compounds$prnp_hit = !is.na(compounds$prnp_z) & (!is.na(compounds$snca_z) | !is.na(compounds$app_z))
 hit_table = rbind(hit_table,cbind("Also tested against SNCA and/or APP 5'UTR",sum(compounds$prnp_hit)))
 compounds$prnp_hit = !is.na(compounds$prnp_z) & compounds$prnp_z > 2.5 & (!is.na(compounds$snca_z) | !is.na(compounds$app_z)) & (is.na(compounds$snca_z) | abs(compounds$snca_z) < 2) & (is.na(compounds$app_z) | abs(compounds$app_z) < 2)
@@ -190,9 +191,6 @@ hit_table = rbind(hit_table,cbind('Also active in Scripps FRET screen',sum(compo
 hit_table
 
 
-mean(!is.na(compounds$fehta_z[!is.na(compounds$prnp_z)]))
-mean(!is.na(compounds$fehta_z[compounds$prnp_hit]))
-
 png(paste(outdir,'utr-vs-cell-surface.png',sep='/'),width=600,height=600)
 par(mar=c(7,7,2,2))
 plot(compounds$prnp_z, compounds$fehta_z, xlim=c(-5,5.2), ylim=c(-5,5.2), xaxs='i', yaxs='i', axes=FALSE, xlab='', ylab='', pch=20, cex=.2, col=pt_col)
@@ -207,9 +205,11 @@ text(x=3.75,y=2,pos=1,labels='shockingly few',font=2,cex=1.5,col=hl_col)
 dev.off()
 
 compounds$utr_nominal = compounds$pubchem_cid %in% prnp_5utr_primary$pubchem_cid[prnp_5utr_primary$pubchem_activity_outcome=='Active']
+compounds$fehta_nominal = compounds$pubchem_cid %in% fehta_primary$pubchem_cid[fehta_primary$pubchem_activity_outcome=='Active']
 screened_subset = compounds[compounds$pubchem_cid %in% prnp_5utr_primary$pubchem_cid & compounds$pubchem_cid %in% fehta_primary$pubchem_cid,]
 contingency_table = table(screened_subset[,c('utr_nominal','fehta_nominal')])
 fisher.test(as.matrix(contingency_table))
+fisher.test(as.matrix(contingency_table))$p.value
 contingency_table
 
 
@@ -218,33 +218,8 @@ sum(compounds$both_nominal)
 sum(compounds$both_nominal & !is.na(compounds$snca_z) & !is.na(compounds$app_z))
 sum(compounds$both_nominal & !is.na(compounds$snca_z) & !is.na(compounds$app_z) & (compounds$snca_z > 2.5 | compounds$app_z > 2.5))
 
+# get structures of the 11 shared hits
 cat(paste(compounds$smiles[compounds$prnp_hit],collapse='.')) # to paste into ChemDraw
-
-hit_fps = fps[compounds$prnp_hit]
-hit_dist = 1 - fp.sim.matrix(fplist=hit_fps, method='tanimoto')
-hit_clustering = hclust(as.dist(hit_dist))
-png(paste(outdir,'prnp_5utr_clusters.png',sep='/'),width=600,height=600)
-par(mar=c(4,4,4,4))
-plot(hit_clustering, main="PRNP 5'UTR hit clustering", xlab='', ylab='', yaxt='n', col=pt_col)
-axis(side=2, at=(0:5)/5, labels=formatC((0:5)/5,digits=1,format='f'), las=2)
-mtext(side=2, line=2.5, text='height')
-dev.off()
-
-hits_export = compounds[compounds$prnp_hit,c('smiles','pubchem_cid')]
-hits_export$cluster = cutree(hit_clustering, h=.6)
-hits_export = hits_export[hits_export$cluster %in% which(table(hits_export$cluster) > 1),]
-write.table(hits_export[,c('cluster','pubchem_cid','smiles')],'results/prnp_5utr_hits.tsv',sep='\t',row.names=FALSE,col.names=TRUE,quote=FALSE)
-sqldf("
-select   cluster, group_concat(smiles, '.')
-from     hits_export
-group by 1
-order by 1
-;")
-# here, I just copied the smiles and pasted structures into ChemDraw
-
-plotmol(parse.smiles(compounds$smiles[compounds$prnp_hit][8])[[1]])
-
-screened_fps = fps[!is.na(compounds$prnp_z)]
 
 
 
@@ -256,7 +231,7 @@ screened_fps = fps[!is.na(compounds$prnp_z)]
 # specific compounds
 # astemizole
 astemizole_smiles = 'COC1=CC=C(C=C1)CCN2CCC(CC2)NC3=NC4=CC=CC=C4N3CC5=CC=C(C=C5)F'
-astemizole_cid = compounds$pubchem_cid[compounds$smiles==astemizole] # 2247
+astemizole_cid = compounds$pubchem_cid[compounds$smiles==astemizole_smiles] # 2247
 amcinonide_cid = 443958 # looked it up online
 # these don't seem to be in the MLPCN collection:
 #tunicamycin_a_cid = 11104835
@@ -268,17 +243,10 @@ fehta_primary[fehta_primary$pubchem_cid==amcinonide_cid,]
 scale(fehta_primary$inhibition_at_13_8_um)[fehta_primary$pubchem_cid==astemizole_cid]
 rank(fehta_primary$inhibition_at_13_8_um)[fehta_primary$pubchem_cid==astemizole_cid]/nrow(fehta_primary)
 
-fehta_silber_overlap = fehta_primary[fehta_primary$pubchem_cid %in% compounds$pubchem_cid[compounds$silber_hit],]
+compounds$silber_hit = compounds$pubchem_cid %in% silber2014$pubchem_cid
+
+fehta_silber_overlap = merge(fehta_primary, silber2014, by='pubchem_cid')
 fehta_silber_overlap
-silber2014$smiles[silber2014$pubchem_cid %in% fehta_primary$pubchem_cid[fehta_primary$pubchem_activity_score==29]]
-
-# for these EC50s, the CIDs are: 2964934, 2997481, 669092, 684756, 2558390, 1069778, 1473035
-fehta_silber_overlap$silber_ec50 = c(0.24, 0.68, 4.13, 0.53, 0.44, 0.69, 1.32)
-plot(log10(fehta_silber_overlap$silber_ec50), fehta_silber_overlap$inhibition_at_13_8_um, pch=20)
-
-compounds[compounds$silber_hit & !is.na(compounds$fehta_z),]
-sum(compounds$silber_hit & !is.na(compounds$fehta_z))
-sum(compounds$silber_hit)
 
 # the hits they called
 compounds$fehta_nominal = compounds$pubchem_cid %in% fehta_primary$pubchem_cid[fehta_primary$pubchem_activity_outcome=='Active']
@@ -306,7 +274,6 @@ compounds$fehta_hit = compounds$fehta_hit & !(compounds$pubchem_cid %in% fehta_c
 hit_table = rbind(hit_table,cbind("Active (if tested) in confirmation screen",sum(compounds$fehta_hit)))
 hit_table
 
-compounds$silber_hit = compounds$pubchem_cid %in% silber2014$pubchem_cid
 
 hit_fps = fps[compounds$fehta_hit | compounds$silber_hit]
 hit_dist_matrix = 1 - fp.sim.matrix(fplist=hit_fps, method='tanimoto')
@@ -347,7 +314,7 @@ group by 1
 having   fehta_hits > 0 and silber_hits > 0
 order by 1
 ;')[,'cluster']
-cat(paste(hits_export$smiles[hits_export$cluster==shared_clusters[2]],collapse='.'))
+cat(paste(hits_export$smiles[hits_export$cluster==shared_clusters[3]],collapse='.'))
 
 
 hits_export$cluster = cutree(hit_clustering, h=.6)
@@ -364,11 +331,11 @@ order by 1
 hits_5clust_export = hits_export[hits_export$cluster %in% fehta_only_5clust,]
 
 # write them out to use the Shoichet Lab aggregator advisor tool
-write.table(hits_5clust_export[,c('smiles','pubchem_cid')],'results/fehta_hits.smi',sep=' ',row.names=FALSE,col.names=TRUE)
+write.table(hits_5clust_export[,c('smiles','pubchem_cid')],'results/cell_surface_hits.smi',sep=' ',row.names=FALSE,col.names=TRUE)
 # python shoichet/simi.py similar results/hits.smi
 # empty results - apparently none of these are similar to known aggregators
 
-# write out the clusters as .-delimited groups of SMILES to paste into ChemDraw
+# write out the clusters each as period-delimited groups of SMILES to paste into ChemDraw
 for (cluster in unique(hits_5clust_export$cluster)) {
   cat(paste(hits_5clust_export$smiles[hits_5clust_export$cluster==cluster],collapse='.'))
   cat('\n')
@@ -380,7 +347,7 @@ for (cluster in unique(hits_5clust_export$cluster)) {
 
 # re-call hits without requiring presence in FEHTA hits
 hit_table = data.frame(step=character(0), count=integer(0))
-hit_table = rbind(hit_table,cbind("Unique compounds tested against PRNP 5'UTR",nrow(prnp)))
+hit_table = rbind(hit_table,cbind("Unique compounds tested against PRNP 5'UTR",nrow(prnp_5utr_primary)))
 compounds$prnp_hit = !is.na(compounds$prnp_z) & (!is.na(compounds$snca_z) | !is.na(compounds$app_z))
 hit_table = rbind(hit_table,cbind("Also tested against SNCA and/or APP 5'UTR",sum(compounds$prnp_hit)))
 compounds$prnp_hit = !is.na(compounds$prnp_z) & compounds$prnp_z > 2.5 & (!is.na(compounds$snca_z) | !is.na(compounds$app_z)) & (is.na(compounds$snca_z) | abs(compounds$snca_z) < 2) & (is.na(compounds$app_z) | abs(compounds$app_z) < 2)
@@ -401,7 +368,7 @@ hit_table = rbind(hit_table,cbind('Active (if tested) in 2.5 uM cherry pick',sum
 hit_fps = fps[compounds$prnp_hit | compounds$silber_hit]
 hit_dist_matrix = 1 - fp.sim.matrix(fplist=hit_fps, method='tanimoto')
 hit_clustering = hclust(as.dist(hit_dist_matrix))
-plot(hit_clustering)
+# plot(hit_clustering)
 hits_export = compounds[compounds$prnp_hit | compounds$silber_hit,c('smiles','pubchem_cid','prnp_hit','silber_hit')]
 hits_export$cluster = cutree(hit_clustering, h=.6)
 utr_only_5clust = sqldf('

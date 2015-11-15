@@ -16,6 +16,9 @@ axis_col = '#000000'
 hl_col = '#660000'
 pt_col = '#FF9912'
 
+# https://raw.githubusercontent.com/ericminikel/miscellanea/master/r_helper.r
+source('../miscellanea/r_helper.r')
+
 # pubchem data have the annoying property that the header row with the
 # column names is followed by several rows of extra metadata that is a
 # different data type (usually strings) than the actual data (usually numeric)
@@ -88,6 +91,9 @@ write.table(data.frame(cid=cids), 'data/cids_to_look_up.tsv', row.names=FALSE, c
 cid_smiles = read.table('data/4128562969890747401.txt',header=FALSE,sep='\t',quote='',comment.char='')
 colnames(cid_smiles) = c('pubchem_cid','smiles')
 
+additional_cid_smiles = read.table('data/2781707481994924472.txt',header=FALSE,sep='\t',quote='',comment.char='')
+colnames(additional_cid_smiles) = c('pubchem_cid','smiles')
+silber2014$smiles = additional_cid_smiles$smiles[match(silber2014$pubchem_cid, additional_cid_smiles$pubchem_cid)]
 compounds = unique(rbind(cid_smiles, silber2014[,c('pubchem_cid','smiles')]))
 
 ####

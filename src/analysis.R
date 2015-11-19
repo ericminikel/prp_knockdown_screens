@@ -221,6 +221,7 @@ sum(compounds$both_nominal & !is.na(compounds$snca_z) & !is.na(compounds$app_z) 
 # get structures of the 11 shared hits
 cat(paste(compounds$smiles[compounds$prnp_hit],collapse='.')) # to paste into ChemDraw
 
+write.table(compounds[compounds$prnp_hit,c('pubchem_cid','smiles')],'results/5utr-surface-11-shared-hits.tsv',sep='\t',col.names=TRUE,row.names=FALSE,quote=FALSE)
 
 
 ####
@@ -341,6 +342,9 @@ for (cluster in unique(hits_5clust_export$cluster)) {
   cat('\n')
 }
 
+write.table(hits_5clust_export[,c('pubchem_cid','smiles','cluster')],'results/surface-clusters.tsv',sep='\t',col.names=TRUE,row.names=FALSE,quote=FALSE)
+
+
 ####
 # Chapter 5: return to the 5'UTR data
 ####
@@ -393,3 +397,6 @@ for (cluster in unique(hits_5clust_export$cluster)) {
   cat(paste(hits_5clust_export$smiles[hits_5clust_export$cluster==cluster],collapse='.'))
   cat('\n')
 }
+
+write.table(hits_5clust_export[,c('pubchem_cid','smiles','cluster')],'results/5utr-clusters.tsv',sep='\t',col.names=TRUE,row.names=FALSE,quote=FALSE)
+
